@@ -39,7 +39,7 @@ def main(args):
                 image, [123.68, 116.779, 103.939])                    # Preprocessing image
             batched_image = tf.expand_dims(processed_image, 0)        # Add batch dimension
             generated_image = model.net(batched_image, training=False)
-            casted_image = tf.cast(generated_image, tf.int32)
+            casted_image = tf.cast(generated_image, tf.uint8)
             # Remove batch dimension
             squeezed_image = tf.squeeze(casted_image, [0], name='output_image')
             # cropped_image = tf.slice(squeezed_image, [0, 0, 0], [height, width, 3])

@@ -6,7 +6,7 @@ import time
 import cv2
 
 
-model_dir = 'model'
+model_dir = '.'
 
 
 def load_graph(frozen_graph_filename):
@@ -27,7 +27,7 @@ def load_graph(frozen_graph_filename):
 
 
 def predict():
-    output_graph_path = os.path.join(model_dir, "output_graph.pb")
+    output_graph_path = os.path.join(model_dir, "wave.pb")
     graph = load_graph(output_graph_path)
 
     for op in graph.get_operations():
