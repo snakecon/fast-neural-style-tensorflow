@@ -4,6 +4,8 @@ import tensorflow as tf
 import argparse
 import time
 import os
+from tensorflow.python.framework import graph_io
+from tensorflow.python.tools import freeze_graph
 
 import model
 import utils
@@ -23,12 +25,15 @@ def main(args):
     with g.as_default():
         with tf.Session() as sess:
             # Building graph.
-            image_data = tf.placeholder(tf.int32, name='input_image')
-            height = tf.placeholder(tf.int32, name='height')
-            width = tf.placeholder(tf.int32, name='width')
+            image = tf.placeholder(tf.uint8, shape=(None, None, 3), name="input_image")
+            # height, width, c = image_data.get_shape().as_list()
+
+            # image_data = tf.placeholder(tf.int32, name='input_image')
+            # height = tf.placeholder(tf.int32, name='height')
+            # width = tf.placeholder(tf.int32, name='width')
 
             # Reshape data
-            image = tf.reshape(image_data, [height, width, 3])
+            # image = tf.reshape(image_data, [height, width, 3])
 
             processed_image = utils.mean_image_subtraction(
                 image, [123.68, 116.779, 103.939])                    # Preprocessing image
@@ -36,10 +41,10 @@ def main(args):
             generated_image = model.net(batched_image, training=False)
             casted_image = tf.cast(generated_image, tf.int32)
             # Remove batch dimension
-            squeezed_image = tf.squeeze(casted_image, [0])
-            cropped_image = tf.slice(squeezed_image, [0, 0, 0], [height, width, 3])
-            # stylized_image = tf.image.encode_jpeg(squeezed_image, name='output_image')
-            stylized_image_data = tf.reshape(cropped_image, [-1], name='output_image')
+            squeezed_image = tf.squeeze(casted_image, [0], name='output_image')
+            # cropped_image = tf.slice(squeezed_image, [0, 0, 0], [height, width, 3])
+            # stylized_image = tf.image.encode_jpeg(squeezed_image)
+            # stylized_image_data = tf.reshape(squeezed_image, [-1], name='output_image')
 
             # Restore model variables.
             saver = tf.train.Saver(tf.global_variables(), write_version=tf.train.SaverDef.V1)
@@ -51,30 +56,56 @@ def main(args):
             if args.is_debug:
                 content_file = '/Users/Lex/Desktop/t.jpg'
                 generated_file = '/Users/Lex/Desktop/xwz-stylized.jpg'
-
-                with open(generated_file, 'wb') as img:
-                    image_bytes = tf.read_file(content_file)
-                    input_array, decoded_image = sess.run([
-                        tf.reshape(tf.image.decode_jpeg(image_bytes, channels=3), [-1]),
-                        tf.image.decode_jpeg(image_bytes, channels=3)])
-
-                    start_time = time.time()
-                    img.write(sess.run(tf.image.encode_jpeg(tf.cast(cropped_image, tf.uint8)), feed_dict={
-                              image_data: input_array,
-                              height: decoded_image.shape[0],
-                              width: decoded_image.shape[1]}))
-                    end_time = time.time()
-
-                    tf.logging.info('Elapsed time: %fs' % (end_time - start_time))
+                #
+                # with open(generated_file, 'wb') as img:
+                #     image_bytes = tf.read_file(content_file)
+                #     input_array, decoded_image = sess.run([
+                #         tf.reshape(tf.image.decode_jpeg(image_bytes, channels=3), [-1]),
+                #         tf.image.decode_jpeg(image_bytes, channels=3)])
+                #
+                #     start_time = time.time()
+                #     img.write(sess.run(tf.image.encode_jpeg(tf.cast(cropped_image, tf.uint8)), feed_dict={
+                #               image_data: input_array,
+                #               height: decoded_image.shape[0],
+                #               width: decoded_image.shape[1]}))
+                #     end_time = time.time()
+                #
+                #     tf.logging.info('Elapsed time: %fs' % (end_time - start_time))
             else:
-                output_graph_def = tf.graph_util.convert_variables_to_constants(
-                    sess, sess.graph_def, output_node_names=['output_image'])
+                # output_graph_def = tf.graph_util.convert_variables_to_constants(
+                #     sess, sess.graph_def, output_node_names=['output_image'])
+                #
+                # with tf.gfile.FastGFile('/Users/Lex/Desktop/' + args.model_name + '.pb', mode='wb') as f:
+                #     f.write(output_graph_def.SerializeToString())
+                #
+                # # tf.train.write_graph(g.as_graph_def(), '/Users/Lex/Desktop',
+                # #                      args.model_name + '.pb', as_text=False)
 
-                with tf.gfile.FastGFile('/Users/Lex/Desktop/' + args.model_name + '.pb', mode='wb') as f:
-                    f.write(output_graph_def.SerializeToString())
 
-                # tf.train.write_graph(g.as_graph_def(), '/Users/Lex/Desktop',
-                #                      args.model_name + '.pb', as_text=False)
+                model_dir = 'model'
+                input_graph_name = "input_graph.pb"
+                output_graph_name = args.model_name
+
+                checkpoint_path = model_file
+
+                print(checkpoint_path)
+                graph_io.write_graph(sess.graph, model_dir, input_graph_name)
+
+                with sess.graph.as_default():
+                    input_graph_path = os.path.join(model_dir, input_graph_name)
+                    input_saver_def_path = ""
+                    input_binary = False
+                    output_node_names = "output_image"
+                    restore_op_name = ""
+                    variable_names_blacklist = ""
+                    filename_tensor_name = ""
+                    output_graph_path = os.path.join(model_dir, output_graph_name)
+                    clear_devices = True
+
+                    freeze_graph.freeze_graph(input_graph_path, input_saver_def_path,
+                                              input_binary, checkpoint_path, output_node_names,
+                                              restore_op_name, filename_tensor_name,
+                                              output_graph_path, clear_devices, variable_names_blacklist)
 
 
 if __name__ == '__main__':
